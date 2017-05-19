@@ -33,6 +33,7 @@
 
 #ifndef __HIREDIS_H
 #define __HIREDIS_H
+#include "crossplatform.h"
 #include "read.h"
 #include <stdarg.h> /* for va_list */
 #include <sys/time.h> /* for struct timeval */
@@ -83,6 +84,12 @@
 /* strerror_r has two completely different prototypes and behaviors
  * depending on system issues, so we need to operate on the error buffer
  * differently depending on which strerror_r we're using. */
+#ifdef _WIN32
+#define __redis_strerror_r(errno, buf, len)                                    \
+    do {                                                                       \
+        strerror_s((buf), (len), (errno));                                     \
+    } while (0)
+#else
 #ifndef _GNU_SOURCE
 /* "regular" POSIX strerror_r that does the right thing. */
 #define __redis_strerror_r(errno, buf, len)                                    \
@@ -102,6 +109,7 @@
             (buf)[(len)-1] = '\0';                                               \
         }                                                                      \
     } while (0)
+#endif
 #endif
 
 #ifdef __cplusplus
@@ -140,7 +148,7 @@ enum redisConnectionType {
 typedef struct redisContext {
     int err; /* Error flags, 0 when there is no error */
     char errstr[128]; /* String representation of error when applicable */
-    int fd;
+    fd_t fd;
     int flags;
     char *obuf; /* Write buffer */
     redisReader *reader; /* Protocol reader */
@@ -170,7 +178,7 @@ redisContext *redisConnectBindNonBlockWithReuse(const char *ip, int port,
 redisContext *redisConnectUnix(const char *path);
 redisContext *redisConnectUnixWithTimeout(const char *path, const struct timeval tv);
 redisContext *redisConnectUnixNonBlock(const char *path);
-redisContext *redisConnectFd(int fd);
+redisContext *redisConnectFd(fd_t fd);
 
 /**
  * Reconnect the given context using the saved information.
@@ -186,7 +194,7 @@ int redisReconnect(redisContext *c);
 int redisSetTimeout(redisContext *c, const struct timeval tv);
 int redisEnableKeepAlive(redisContext *c);
 void redisFree(redisContext *c);
-int redisFreeKeepFd(redisContext *c);
+fd_t redisFreeKeepFd(redisContext *c);
 int redisBufferRead(redisContext *c);
 int redisBufferWrite(redisContext *c, int *done);
 

@@ -604,20 +604,21 @@ static redisContext *redisContextInit(void) {
     c->tcp.source_addr = NULL;
     c->unix_sock.path = NULL;
     c->timeout = NULL;
+    c->fd = INVALID_FD;
 
     if (c->obuf == NULL || c->reader == NULL) {
         redisFree(c);
         return NULL;
     }
-
+    os_contextInit();
     return c;
 }
 
 void redisFree(redisContext *c) {
     if (c == NULL)
         return;
-    if (c->fd > 0)
-        close(c->fd);
+    if (c->fd != INVALID_FD)
+        os_close(c->fd);
     if (c->obuf != NULL)
         sdsfree(c->obuf);
     if (c->reader != NULL)
@@ -631,11 +632,12 @@ void redisFree(redisContext *c) {
     if (c->timeout)
         free(c->timeout);
     free(c);
+    os_contextCleanup();
 }
 
-int redisFreeKeepFd(redisContext *c) {
-    int fd = c->fd;
-    c->fd = -1;
+fd_t redisFreeKeepFd(redisContext *c) {
+    fd_t fd = c->fd;
+    c->fd = INVALID_FD;
     redisFree(c);
     return fd;
 }
@@ -644,8 +646,8 @@ int redisReconnect(redisContext *c) {
     c->err = 0;
     memset(c->errstr, '\0', strlen(c->errstr));
 
-    if (c->fd > 0) {
-        close(c->fd);
+    if (c->fd != INVALID_FD) {
+        os_close(c->fd);
     }
 
     sdsfree(c->obuf);
@@ -732,7 +734,9 @@ redisContext *redisConnectUnix(const char *path) {
         return NULL;
 
     c->flags |= REDIS_BLOCK;
-    redisContextConnectUnix(c,path,NULL);
+    if (redisContextConnectUnix(c,path,NULL) != REDIS_OK) {
+        __redisSetError(c, REDIS_ERR_IO, NULL);
+    }
     return c;
 }
 
@@ -744,7 +748,9 @@ redisContext *redisConnectUnixWithTimeout(const char *path, const struct timeval
         return NULL;
 
     c->flags |= REDIS_BLOCK;
-    redisContextConnectUnix(c,path,&tv);
+    if (redisContextConnectUnix(c,path,&tv) != REDIS_OK) {
+        __redisSetError(c, REDIS_ERR_IO, NULL);
+    }
     return c;
 }
 
@@ -756,11 +762,13 @@ redisContext *redisConnectUnixNonBlock(const char *path) {
         return NULL;
 
     c->flags &= ~REDIS_BLOCK;
-    redisContextConnectUnix(c,path,NULL);
+    if (redisContextConnectUnix(c,path,NULL) != REDIS_OK) {
+        __redisSetError(c, REDIS_ERR_IO, NULL);
+    }
     return c;
 }
 
-redisContext *redisConnectFd(int fd) {
+redisContext *redisConnectFd(fd_t fd) {
     redisContext *c;
 
     c = redisContextInit();
@@ -799,7 +807,7 @@ int redisBufferRead(redisContext *c) {
     if (c->err)
         return REDIS_ERR;
 
-    nread = read(c->fd,buf,sizeof(buf));
+    nread = os_read(c->fd,buf,sizeof(buf));
     if (nread == -1) {
         if ((errno == EAGAIN && !(c->flags & REDIS_BLOCK)) || (errno == EINTR)) {
             /* Try again later */
@@ -836,7 +844,7 @@ int redisBufferWrite(redisContext *c, int *done) {
         return REDIS_ERR;
 
     if (sdslen(c->obuf) > 0) {
-        nwritten = write(c->fd,c->obuf,sdslen(c->obuf));
+        nwritten = os_write(c->fd,c->obuf,sdslen(c->obuf));
         if (nwritten == -1) {
             if ((errno == EAGAIN && !(c->flags & REDIS_BLOCK)) || (errno == EINTR)) {
                 /* Try again later */
