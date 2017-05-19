@@ -1,3 +1,8 @@
+# Fork Owner's comments
+This fork has been updated to hiredis' 97cd8157f74674c722dd30360caac1f498fa72ef 
+Using CMake to build it.
+No MSVC support. If you want a MSVC build please look into RedisServer for Windows. It contains a msvc compatible hiredis client.
+
 [![Build Status](https://travis-ci.org/redis/hiredis.png)](https://travis-ci.org/redis/hiredis)
 
 **This Readme reflects the latest changed in the master branch. See [v0.13.3](https://github.com/redis/hiredis/tree/v0.13.3) for the Readme and documentation for the latest release.**
