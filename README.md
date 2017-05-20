@@ -7,9 +7,7 @@ Using CMake to build it.
 
 No MSVC support. 
 
-If you want a MSVC build please look into RedisServer for Windows. 
-
-It contains a MSVC compatible hiredis client.
+If you want a MSVC build please look into RedisServer for Windows which contains a MSVC compatible hiredis client.
 
 -----------------
 
