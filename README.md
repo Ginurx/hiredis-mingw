@@ -1,4 +1,4 @@
-# Fork Owner's comments
+# hiredis-mingw comments
 
 
 This fork has been updated to hiredis' 97cd8157f74674c722dd30360caac1f498fa72ef 
